@@ -10,6 +10,7 @@ project(falkotest)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
+  geometry_msgs
 )
 
 # Required for falkolib

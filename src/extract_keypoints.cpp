@@ -8,6 +8,7 @@
 // ROS
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
+#include "geometry_msgs/PointStamped.h"
 
 // Libraries
 // falkolib does the feature extraction
@@ -42,6 +43,8 @@ int main(int argc, char *argv[])
     // Names
     const char node_name[] = "keypoint_extractor";
     const char laser_topic[] = "/scan";
+    const char keypoint_topic[] = "/keypoints";
+    const char frame_name[] = "base_link";
 
     // Init ROS
     ros::init(argc, argv, node_name);
@@ -51,6 +54,9 @@ int main(int argc, char *argv[])
     // Create a laser subscriber
     // Message queue is set to 1 to only use callback on latest message
     ros::Subscriber laser_sub = n.subscribe(laser_topic, 1, laser_callback);
+
+    // Publish extracted points
+    ros::Publisher keypoint_pub = n.advertise<geometry_msgs::PointStamped>(keypoint_topic, 1000);
 
     // Prepare feature extraction library
     // Feature extraction parameters
@@ -78,9 +84,29 @@ int main(int argc, char *argv[])
         // Extract features
         std::vector<falkolib::FALKO> keypoints;
         fe.extract(scan_data, keypoints);
+        ROS_INFO("Found %d keypoints", (int)keypoints.size());
+
+        // Publish keypoints
+        if ((int) keypoints.size() > 0)
+        {
+            // Get distance and orientation of keypoint
+            double r = keypoints[0].radius;
+            double theta = keypoints[0].orientation;
+
+            // There are keypoints, extract them
+            geometry_msgs::PointStamped kp; // Create the pub object
+            ros::Time t = ros::Time::now();
+            kp.header.stamp = t;
+            kp.header.frame_id = frame_name;
+            kp.point.x = keypoints[0].point[0];//r*std::cos(theta);
+            kp.point.y = keypoints[0].point[1];//r*std::sin(theta);
+            kp.point.z = 0;
+
+            // Publish
+            keypoint_pub.publish(kp);
+        }
 
         // Print number of points
-        ROS_INFO("Found %d keypoints", (int)keypoints.size());
 
         rate.sleep();
     }
