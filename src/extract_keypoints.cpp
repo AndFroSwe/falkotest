@@ -8,7 +8,8 @@
 // ROS
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-#include "geometry_msgs/PointStamped.h"
+#include "geometry_msgs/Point.h"
+#include "visualization_msgs/Marker.h"
 
 // Libraries
 // falkolib does the feature extraction
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
     ros::Subscriber laser_sub = n.subscribe(laser_topic, 1, laser_callback);
 
     // Publish extracted points
-    ros::Publisher keypoint_pub = n.advertise<geometry_msgs::PointStamped>(keypoint_topic, 1000);
+    ros::Publisher keypoint_pub = n.advertise<visualization_msgs::Marker>(keypoint_topic, 1000);
 
     // Prepare feature extraction library
     // Feature extraction parameters
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
 
     // Main loop
     // Reads laser data, extracts keypoints and publishes them as points
-    ros::Rate rate(0.5);
+    ros::Rate rate(1);
     while (ros::ok())
     {
         ros::spinOnce(); // Get subscription readings
@@ -89,21 +90,38 @@ int main(int argc, char *argv[])
         // Publish keypoints
         if ((int) keypoints.size() > 0)
         {
-            // Get distance and orientation of keypoint
-            double r = keypoints[0].radius;
-            double theta = keypoints[0].orientation;
-
-            // There are keypoints, extract them
-            geometry_msgs::PointStamped kp; // Create the pub object
             ros::Time t = ros::Time::now();
-            kp.header.stamp = t;
-            kp.header.frame_id = frame_name;
-            kp.point.x = keypoints[0].point[0];//r*std::cos(theta);
-            kp.point.y = keypoints[0].point[1];//r*std::sin(theta);
-            kp.point.z = 0;
+            // Create marker message
+            visualization_msgs::Marker vp;
+            vp.header.stamp = t;
+            vp.header.frame_id = frame_name;
+            vp.ns = "falko";
+            vp.action = visualization_msgs::Marker::ADD;
+            vp.pose.orientation.w = 1.0;
+            vp.id = 0;
+            vp.type = visualization_msgs::Marker::POINTS;
+            vp.scale.x = 0.2;
+            vp.scale.y = 0.2;
+            vp.color.g = 1.0f;
+            vp.color.a = 1.0;
+            ros::Duration d(1.0);
+            vp.lifetime = d;
+
+            // Add all keypoints to array
+            for (int i = 0; i < (int)keypoints.size(); ++i) {
+                ROS_INFO("Adding");
+                // There are keypoints, extract them
+                geometry_msgs::Point kp; // Create the pub object
+
+                kp.x = keypoints[i].point[0]; // point is of type Eigen::Matrix
+                kp.y = keypoints[i].point[1]; // point is of type Eigen::Matrix
+                kp.z = 0;
+
+                vp.points.push_back(kp);
+            }
 
             // Publish
-            keypoint_pub.publish(kp);
+            keypoint_pub.publish(vp);
         }
 
         // Print number of points
